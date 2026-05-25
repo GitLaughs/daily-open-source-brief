@@ -1,0 +1,91 @@
+github:
+  queries:
+    - name: high-star-active
+      q: "stars:>5000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: high-star-mid
+      q: "stars:5000..20000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: ai-active
+      q: "topic:ai stars:>3000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: self-hosted-active
+      q: "topic:self-hosted stars:>1000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: data-tools-active
+      q: "data tools stars:>500 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: devops-active
+      q: "topic:devops stars:>1000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: security-active
+      q: "topic:security stars:>1000 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: prompts-templates-active
+      q: "prompt templates stars:>100 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+topics:
+  include:
+    - ai
+    - automation
+    - cli
+    - developer-tools
+    - infra
+    - observability
+    - security
+    - self-hosted
+languages:
+  include:
+    - Python
+    - TypeScript
+    - Go
+    - Rust
+    - JavaScript
+    - Java
+public_notices:
+  priority_keywords:
+    - registration
+    - deadline
+    - application
+    - maintenance
+news:
+  priority_keywords:
+    - AI
+    - automation
+    - developer tools
+    - open source
+    - security
+    - infrastructure
+rss:
+  - name: ieee-spectrum
+    title: IEEE Spectrum
+    url: https://spectrum.ieee.org/rss/fulltext
+    source_type: tech_news
+    category: technology
+    enabled: true
+    limit: 10
+    weight: 4
+    tags:
+      - technology
+      - engineering
+    priority_keywords:
+      - AI
+      - chip
+      - robotics
+      - computing
+webpages:
+  - name: example-public-notices
+    title: Example Public Notices
+    url: https://example.edu/notices/
+    source_type: public_notice
+    category: notices
+    enabled: false
+    limit: 12
+    weight: 5
+    url_allow_patterns:
+      - /notice/
+    priority_keywords:
+      - registration
+      - deadline
+      - exam
+      - application

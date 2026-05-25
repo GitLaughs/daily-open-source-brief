@@ -1,0 +1,33 @@
+plugins:
+  ccswitch:
+    kind: provider
+    enabled: true
+
+  github:
+    kind: collector
+    enabled: true
+    limit: 40
+
+  webpage:
+    kind: collector
+    enabled: true
+
+  rss:
+    kind: collector
+    enabled: true
+
+  summarizer:
+    kind: summarizer
+    enabled: true
+
+  renderer:
+    kind: renderer
+    enabled: true
+
+  lark:
+    kind: sender
+    enabled: true
+
+  mail:
+    kind: sender
+    enabled: true
