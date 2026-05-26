@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.1 - 2026-05-26
+
+Patch release for Windows CI reliability.
+
+### Fixes
+
+- Close SQLite connections when using `with db.connect(...)` so Windows can delete temporary database files after tests.
+
+### Verify
+
+- `python -m pytest`
+- `git diff --check`
+
 ## v0.2.0 - 2026-05-26
 
 Windows onboarding, richer plugin stages, and expanded delivery workflow.

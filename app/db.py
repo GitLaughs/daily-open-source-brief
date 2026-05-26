@@ -231,9 +231,17 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, factory=ClosingConnection)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     ensure_migrations(conn)

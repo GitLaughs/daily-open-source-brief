@@ -1,11 +1,12 @@
-# daily-open-source-brief v0.2.0｜Windows 新手安装与插件增强
+# daily-open-source-brief v0.2.1｜Windows 新手安装与插件增强
 
-This release adds a Chinese Windows onboarding path, one-command install/test scripts, GitHub Actions CI, and a broader plugin pipeline for enrichment, delivery, and digest operations.
+This patch release keeps the v0.2.0 Windows onboarding and plugin enhancements, and fixes Windows CI cleanup by closing SQLite connections after context-managed use.
 
 中文关键词：开源日报、Windows 安装、GitHub 项目摘要、RSS 摘要、网页采集、SQLite FTS5、知识库、插件管线、自动化日报。
 
 ## Highlights
 
+- Fixed SQLite connection cleanup on Windows test runners.
 - Added `README.zh-CN.md`, `docs/install-windows.md`, and `docs/workflow-zh.md`.
 - Added Windows scripts for install, validation, and optional scheduled task registration.
 - Added GitHub Actions CI on Windows and Linux.
