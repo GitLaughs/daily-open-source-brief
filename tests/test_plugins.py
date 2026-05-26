@@ -9,7 +9,7 @@ from unittest.mock import patch
 from app import db
 from app.config import Paths
 from app.plugins.base import BasePlugin, PluginContext, PluginResult
-from app.plugins.builtins import GithubCollectorPlugin, LarkSenderPlugin
+from app.plugins.builtins import DeadlineEnricherPlugin, GithubCollectorPlugin, LarkSenderPlugin, builtin_registry
 from app.plugins.local_loader import load_local_plugins
 from app.plugins.manager import PluginManager, load_plugin_settings
 from app.plugins.registry import PluginRegistry
@@ -45,6 +45,7 @@ plugins:
             self.assertTrue(settings["github"]["enabled"])
             self.assertEqual(settings["github"]["limit"], 2)
             self.assertIn("renderer", settings)
+            self.assertIn("deadline", settings)
 
     def test_manager_skips_disabled_plugin(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -216,6 +217,57 @@ plugins:
                 health = db.load_plugin_health(conn)
                 self.assertEqual(health[0]["plugin_name"], "dummy")
                 self.assertEqual(health[0]["last_status"], "success")
+            finally:
+                conn.close()
+
+    def test_builtin_registry_includes_enricher_plugins(self):
+        registry = builtin_registry()
+        settings = load_plugin_settings(Path("missing.yml"))
+        rows = registry.list_plugins(settings)
+        kinds = {row["name"]: row["kind"] for row in rows}
+
+        self.assertEqual(kinds["feedback"], "enricher")
+        self.assertEqual(kinds["deadline"], "enricher")
+        self.assertEqual(kinds["cross_source_dedupe"], "enricher")
+
+    def test_deadline_enricher_writes_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            conn = db.connect(root / "brief.sqlite")
+            try:
+                paths = Paths(
+                    root=root,
+                    config=root / "sources.yml",
+                    plugins=root / "plugins.yml",
+                    data_dir=root,
+                    db=root / "brief.sqlite",
+                    archive_dir=root / "archive",
+                    log_dir=root / "logs",
+                )
+                ctx = PluginContext(
+                    conn,
+                    paths,
+                    {},
+                    date(2026, 5, 25),
+                    {},
+                    {
+                        "web_items": [
+                            {
+                                "_item_id": 1,
+                                "title": "选课确认截止 2026年6月5日",
+                                "content_snippet": "",
+                                "url": "https://example.com/deadline",
+                            }
+                        ]
+                    },
+                )
+
+                result = DeadlineEnricherPlugin().run(ctx)
+
+                self.assertEqual(result.item_count, 1)
+                self.assertEqual(ctx.state["deadline_events"][0]["deadline"], "2026-06-05")
+                rows = db.load_deadline_events(conn)
+                self.assertEqual(rows[0]["event_type"], "确认")
             finally:
                 conn.close()
 

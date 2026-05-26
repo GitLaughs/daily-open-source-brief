@@ -4,12 +4,15 @@ import html
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any, Iterable, Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 
 DEFAULT_USER_AGENT = (
@@ -59,36 +62,55 @@ def fetch_webpages_from_config(
     errors: list[dict[str, str]] = []
     runs: list[dict[str, Any]] = []
     global_keywords = list(config.get("school", {}).get("priority_keywords") or [])
-    for source in config.get("webpages", []) or []:
-        if not source.get("enabled", True):
-            continue
+    sources = [source for source in config.get("webpages", []) or [] if source.get("enabled", True)]
+
+    def collect_one(source: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
         source_config = dict(source)
         source_config["priority_keywords"] = global_keywords + list(source.get("priority_keywords") or [])
         started_at = utc_now()
         started = time.perf_counter()
         try:
             source_entries = fetch_webpage_source(source_config, today=today, timeout=timeout)
-            entries.extend(source_entries)
-            runs.append(
+            return (
+                source_entries,
+                [],
                 source_run(
                     source_config,
                     "success",
                     item_count=len(source_entries),
                     started_at=started_at,
                     duration_ms=elapsed_ms(started),
-                )
+                ),
             )
         except Exception as exc:
-            errors.append(FetchError(str(source.get("name") or source.get("url") or "webpage"), str(source.get("url") or ""), str(exc)).as_dict())
-            runs.append(
+            return (
+                [],
+                [FetchError(str(source.get("name") or source.get("url") or "webpage"), str(source.get("url") or ""), str(exc)).as_dict()],
                 source_run(
                     source_config,
                     "failed",
                     error_message=str(exc),
                     started_at=started_at,
                     duration_ms=elapsed_ms(started),
-                )
+                ),
             )
+
+    if not sources:
+        return [], [], []
+    workers = min(len(sources), int(config.get("webpage_parallel_workers") or 4))
+    if workers <= 1:
+        results = [collect_one(source) for source in sources]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(collect_one, source): index for index, source in enumerate(sources)}
+            ordered: list[tuple[int, tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]]] = []
+            for future in as_completed(futures):
+                ordered.append((futures[future], future.result()))
+            results = [result for _index, result in sorted(ordered, key=lambda item: item[0])]
+    for source_entries, source_errors, source_run_item in results:
+        entries.extend(source_entries)
+        errors.extend(source_errors)
+        runs.append(source_run_item)
     return dedupe_entries(entries), errors, runs
 
 
@@ -123,6 +145,8 @@ def fetch_webpage_source(source: dict[str, Any], *, today: date, timeout: int = 
     session = requests.Session()
     text = fetch_html(session, url, timeout=timeout)
     entries = parse_webpage_entries(text, url, source, today=today)
+    if source.get("fetch_detail"):
+        enrich_detail_texts(session, entries, source, timeout=timeout)
     limit = int(source.get("limit", 12))
     return entries[:limit]
 
@@ -238,21 +262,27 @@ def parse_webpage_entries(
     fetched_at = utc_now()
     source_name = str(source.get("name") or source.get("title") or page_url)
     source_title = str(source.get("title") or source_name)
-    blocks = re.findall(r"<li\b[\s\S]*?</li>", text, flags=re.IGNORECASE)
+    soup = BeautifulSoup(text, "html.parser")
+    blocks: list[Tag] = [node for node in soup.select("ul li, ol li") if isinstance(node, Tag)]
     if not blocks:
-        blocks = re.findall(r"<tr\b[\s\S]*?</tr>", text, flags=re.IGNORECASE)
+        blocks = [node for node in soup.find_all("li") if isinstance(node, Tag)]
+    if not blocks:
+        blocks = [node for node in soup.select("table tr") if isinstance(node, Tag)]
 
-    for block in blocks:
-        anchor = first_anchor(block)
-        if not anchor:
+    for block_node in blocks:
+        anchor_node = block_node.select_one("a[href]")
+        if not isinstance(anchor_node, Tag):
             continue
-        href, attrs, inner = anchor
+        href = str(anchor_node.get("href") or "")
         url = normalize_url(page_url, href)
-        title = clean_title(attrs.get("title") or strip_tags(inner))
+        title_attr = anchor_node.get("title")
+        title = clean_title(str(title_attr) if title_attr else anchor_node.get_text(" ", strip=True))
         if not title or should_skip_title(title):
             continue
         if not url_allowed(url, source):
             continue
+        block = str(block_node)
+        inner = str(anchor_node)
         published_at = extract_date(block) or extract_date(inner)
         snippet = clean_snippet(block, title)
         entry = {
@@ -277,6 +307,38 @@ def parse_webpage_entries(
         candidates.append(entry)
     candidates.sort(key=lambda item: (item.get("_score", 0), item.get("published_at") or ""), reverse=True)
     return dedupe_entries(candidates)
+
+
+def enrich_detail_texts(
+    session: requests.Session,
+    entries: list[dict[str, Any]],
+    source: dict[str, Any],
+    *,
+    timeout: int = 25,
+) -> None:
+    max_chars = int(source.get("detail_max_chars") or 2000)
+    detail_timeout = int(source.get("detail_timeout") or min(timeout, 10))
+    for entry in entries:
+        if float(entry.get("_score") or 0) < 70:
+            continue
+        detail = fetch_detail_text(session, str(entry.get("url") or ""), max_chars=max_chars, timeout=detail_timeout)
+        if detail:
+            entry["content_full"] = detail
+
+
+def fetch_detail_text(session: requests.Session, url: str, max_chars: int = 2000, timeout: int = 10) -> str | None:
+    try:
+        text = fetch_html(session, url, timeout=timeout)
+        soup = BeautifulSoup(text, "html.parser")
+        content = soup.select_one(".content, #content, .article, article, .v_news_content")
+        if not content:
+            content = soup.body
+        if not content:
+            return None
+        value = normalize_space(content.get_text("\n", strip=True))
+        return value[:max_chars] if value else None
+    except Exception:
+        return None
 
 
 def first_anchor(block: str) -> Optional[tuple[str, dict[str, str], str]]:
@@ -437,6 +499,7 @@ def web_entry_to_item(entry: dict[str, Any], source_id: int) -> dict[str, Any]:
         "title": str(entry["title"]),
         "url": str(entry["url"]),
         "content_snippet": str(entry.get("content_snippet") or ""),
+        "content_full": entry.get("content_full"),
         "raw_json": json.dumps(raw, ensure_ascii=False),
         "hash": str(entry["url"]).lower(),
         "published_at": entry.get("published_at"),

@@ -30,6 +30,8 @@ def build_profile(config_path: Path, user_id: str) -> dict[str, Any]:
         if item.get("name")
     ]
     inferred_topics = ["ai", "developer-tools", "automation", "cli", "self-hosted", "infra"]
+    if any("集创赛" in name for name in chat_names):
+        inferred_topics.extend(["embedded", "hardware", "fpga", "edge-ai"])
     data = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "lark_user": {

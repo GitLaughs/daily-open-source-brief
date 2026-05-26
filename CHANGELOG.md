@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.0 - 2026-05-26
+
+Windows onboarding, richer plugin stages, and expanded delivery workflow.
+
+### Highlights
+
+- Added Chinese README, Windows install guide, and Chinese daily workflow guide.
+- Added `scripts/install-windows.ps1`, `scripts/test.ps1`, and `scripts/register-windows-task.ps1`.
+- Added GitHub Actions CI across Windows and Linux Python versions.
+- Added optional GitHub Trending collector and enricher plugins for feedback weights, deadline extraction, cross-source dedupe, and Lark digest filtering.
+- Added deadline, dedupe, feedback, LLM retry, weekly metrics, Lark bot, and HTML email/template support.
+- Expanded SQLite state with deadline events and improved plugin health/run tracking.
+- Improved RSS and webpage fetch behavior, including parallelism and optional detail fetching.
+
+### Verify
+
+- `python -m pytest`
+- `python -m unittest discover -s tests -v`
+- `git diff --check`
+- `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
+
 ## v0.1.0 - 2026-05-25
 
 Initial public release.

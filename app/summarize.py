@@ -7,12 +7,14 @@ from typing import Any, Optional
 
 import requests
 
+from .llm_retry import retry_on_transient
 
-SYSTEM_PROMPT = """你是一个工程与开源日报助理。
-输入包含 GitHub 仓库、公开网页通知、RSS/通用新闻和行业资讯。
+
+SYSTEM_PROMPT = """你是我的个性日报助理。
+输入包含 GitHub 仓库、校园官网公开通知、RSS/通用新闻和半导体/EDA 产业资讯。
 请筛掉低价值重复内容，输出一份中文日报：
 1. 今日优先处理
-2. 网页与产业资讯雷达
+2. 校园与产业资讯雷达
 3. 今日最值得看的开源项目
 4. 可后续尝试的项目
 每条不超过 120 字，保留链接。
@@ -29,7 +31,7 @@ def compact_repo(repo: dict[str, Any]) -> dict[str, Any]:
         "license": (repo.get("license") or {}).get("spdx_id") if isinstance(repo.get("license"), dict) else None,
         "topics": repo.get("topics") or [],
         "pushed_at": repo.get("pushed_at"),
-        "score": repo.get("_score"),
+        "score": repo.get("_effective_score", repo.get("_score")),
     }
 
 
@@ -41,7 +43,7 @@ def compact_web_item(item: dict[str, Any]) -> dict[str, Any]:
         "url": item.get("url"),
         "published_at": item.get("published_at"),
         "snippet": item.get("content_snippet"),
-        "score": item.get("_score"),
+        "score": item.get("_effective_score", item.get("_score")),
     }
 
 
@@ -85,36 +87,46 @@ def summarize_with_llm(
     }
     if reasoning_effort:
         responses_payload["reasoning"] = {"effort": reasoning_effort}
+    response = post_responses_api(base_url, responses_payload, timeout)
+    if response.status_code < 400:
+        return extract_responses_text(parse_json_response(response)).strip()
+
+    response = post_chat_completion(base_url, model, user_content, timeout)
+    return extract_chat_text(parse_json_response(response)).strip()
+
+
+@retry_on_transient()
+def post_responses_api(base_url: str, payload: dict[str, Any], timeout: int) -> requests.Response:
     try:
-        response = requests.post(
-            f"{base_url}/responses",
-            headers=llm_headers(),
-            json=responses_payload,
-            timeout=timeout,
-        )
-        if response.status_code < 400:
-            return extract_responses_text(parse_json_response(response)).strip()
-        if response.status_code not in {400, 404, 405, 422}:
-            raise RuntimeError(f"LLM Responses API error {response.status_code}: {response.text[:300]}")
+        response = requests.post(f"{base_url}/responses", headers=llm_headers(), json=payload, timeout=timeout)
     except requests.RequestException as exc:
         raise RuntimeError(f"LLM Responses API request failed: {exc}") from exc
+    if response.status_code >= 400 and response.status_code not in {400, 404, 405, 422}:
+        raise RuntimeError(f"LLM Responses API error {response.status_code}: {response.text[:300]}")
+    return response
 
-    response = requests.post(
-        f"{base_url}/chat/completions",
-        headers=llm_headers(),
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            "temperature": 0.3,
-        },
-        timeout=timeout,
-    )
+
+@retry_on_transient()
+def post_chat_completion(base_url: str, model: str, user_content: str, timeout: int) -> requests.Response:
+    try:
+        response = requests.post(
+            f"{base_url}/chat/completions",
+            headers=llm_headers(),
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+                "temperature": 0.3,
+            },
+            timeout=timeout,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"LLM Chat API request failed: {exc}") from exc
     if response.status_code >= 400:
         raise RuntimeError(f"LLM Chat API error {response.status_code}: {response.text[:300]}")
-    return extract_chat_text(parse_json_response(response)).strip()
+    return response
 
 
 def llm_headers() -> dict[str, str]:
@@ -166,18 +178,31 @@ def fallback_digest(
     repos: list[dict[str, Any]],
     web_items: Optional[list[dict[str, Any]]] = None,
     source_errors: Optional[list[dict[str, str]]] = None,
+    deadline_events: Optional[list[dict[str, Any]]] = None,
 ) -> str:
     web_items = web_items or []
-    if not repos and not web_items:
-        return "今日无高价值 GitHub 仓库、公开网页或 RSS 资讯更新。"
+    deadline_events = deadline_events or []
+    if not repos and not web_items and not deadline_events:
+        return "今日无高价值 GitHub 仓库、校园官网或 RSS 资讯更新。"
 
-    lines = ["# 今日开源与工程日报"]
-    if web_items:
+    lines = ["# 今日个人日报"]
+    active_deadlines = [event for event in deadline_events if event.get("status") != "expired"]
+    if active_deadlines:
         lines.extend(["", "## 今日优先处理"])
+        for event in active_deadlines[:5]:
+            lines.append(
+                f"- [{event.get('event_type', '事项')}] {event.get('title', '未命名')}："
+                f"{event.get('deadline')} 截止\n  链接：{event.get('source_url') or ''}"
+            )
+    if web_items:
+        if not active_deadlines:
+            lines.extend(["", "## 今日优先处理"])
+        else:
+            lines.extend(["", "## 校园与产业资讯雷达"])
         for item in web_items[:5]:
             lines.append(format_web_item(item))
         if len(web_items) > 5:
-            lines.extend(["", "## 网页与产业资讯雷达"])
+            lines.extend(["", "## 校园与产业资讯雷达"])
             for item in web_items[5:12]:
                 lines.append(format_web_item(item))
 
@@ -208,7 +233,7 @@ def format_repo(repo: dict[str, Any]) -> str:
         f"- {repo['full_name']} / {repo.get('stargazers_count', 0)} stars / "
         f"{repo.get('language') or 'Unknown'} / {license_name or 'Unknown'}\n"
         f"  {repo.get('description') or '暂无简介'}\n"
-        f"  值得看：评分 {repo.get('_score', 0)}，主题 {topics or '未标注'}，最近更新 {repo.get('pushed_at') or '未知'}。\n"
+        f"  值得看：评分 {repo.get('_effective_score', repo.get('_score', 0))}，主题 {topics or '未标注'}，最近更新 {repo.get('pushed_at') or '未知'}。\n"
         f"  链接：{repo['html_url']}"
     )
 
@@ -230,6 +255,7 @@ def build_digest(
     repos: list[dict[str, Any]],
     web_items: Optional[list[dict[str, Any]]] = None,
     source_errors: Optional[list[dict[str, str]]] = None,
+    deadline_events: Optional[list[dict[str, Any]]] = None,
 ) -> tuple[str, str]:
     try:
         llm_text = summarize_with_llm(repos, web_items=web_items, source_errors=source_errors)
@@ -244,8 +270,8 @@ def build_digest(
                     name = provider["name"] if provider else "fallback"
                     return llm_text, f"llm_fallback:{name}"
             except Exception as fallback_exc:
-                return fallback_digest(repos, web_items, source_errors), f"llm_failed: {exc}; fallback_failed: {fallback_exc}"
-        return fallback_digest(repos, web_items, source_errors), f"llm_failed: {exc}"
+                return fallback_digest(repos, web_items, source_errors, deadline_events), f"llm_failed: {exc}; fallback_failed: {fallback_exc}"
+        return fallback_digest(repos, web_items, source_errors, deadline_events), f"llm_failed: {exc}"
     if llm_text:
         return llm_text, "llm"
-    return fallback_digest(repos, web_items, source_errors), "template"
+    return fallback_digest(repos, web_items, source_errors, deadline_events), "template"

@@ -6,6 +6,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 
 def linkify(escaped_text: str) -> str:
     return re.sub(
@@ -68,10 +70,12 @@ def render_email(
     web_items: list[dict[str, Any]] | None = None,
     source_errors: list[dict[str, str]] | None = None,
     source_health: list[dict[str, Any]] | None = None,
+    deadline_events: list[dict[str, Any]] | None = None,
 ) -> str:
     web_items = web_items or []
     source_errors = source_errors or []
     source_health = source_health or []
+    deadline_events = deadline_events or []
     rows: list[str] = []
     for repo in repos[:20]:
         rows.append(
@@ -79,15 +83,31 @@ def render_email(
             f"<td><a href=\"{html.escape(repo['html_url'])}\">{html.escape(repo['full_name'])}</a></td>"
             f"<td>{int(repo.get('stargazers_count') or 0):,}</td>"
             f"<td>{html.escape(repo.get('language') or '')}</td>"
-            f"<td>{html.escape(str(repo.get('_score', '')))}</td>"
+            f"<td>{html.escape(str(repo.get('_effective_score', repo.get('_score', ''))))}</td>"
             "</tr>"
         )
     table = "\n".join(rows) if rows else "<tr><td colspan=\"4\">今日无高价值更新</td></tr>"
     body = markdownish_to_html(text_content)
     school_cards = render_web_cards(web_items[:8])
     repo_cards = render_repo_cards(repos[:6])
+    deadlines = render_deadline_events(deadline_events)
     health = render_source_health(source_errors, source_health)
     metrics = render_metrics(repos, web_items, mode)
+    template_path = Path(__file__).resolve().parents[1] / "templates"
+    if template_path.exists():
+        env = Environment(loader=FileSystemLoader(template_path), autoescape=select_autoescape(["html", "xml"]))
+        template = env.get_template("email.html")
+        return template.render(
+            digest_date=digest_date,
+            mode=mode,
+            metrics=metrics,
+            body=body,
+            deadlines=deadlines,
+            school_cards=school_cards,
+            repo_cards=repo_cards,
+            health=health,
+            table=table,
+        )
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -171,13 +191,14 @@ def render_email(
 <main>
   <header>
     <div class="meta">生成日期：{digest_date.isoformat()} · 摘要模式：{html.escape(mode)}</div>
-    <h1>开源与工程日报</h1>
+    <h1>个人技术与产业日报</h1>
     {metrics}
   </header>
   <section>
     <h2>今日简报</h2>
     <div class="digest">{body}</div>
   </section>
+  {deadlines}
   <section>
     <h2>网页与 RSS 情报源</h2>
     {school_cards}
@@ -249,6 +270,23 @@ def render_web_cards(items: list[dict[str, Any]]) -> str:
             "</article>"
         )
     return '<div class="grid">' + "\n".join(cards) + "</div>"
+
+
+def render_deadline_events(events: list[dict[str, Any]]) -> str:
+    active = [event for event in events if event.get("status") != "expired"]
+    if not active:
+        return ""
+    rows = []
+    for event in active[:8]:
+        rows.append(
+            '<article class="item-card">'
+            f'<div class="tagline"><span class="tag">{html.escape(str(event.get("event_type") or "事项"))}</span>'
+            f'<span>{html.escape(str(event.get("deadline") or ""))}</span></div>'
+            f'<h3><a href="{html.escape(str(event.get("source_url") or ""), quote=True)}">{html.escape(str(event.get("title") or "未命名"))}</a></h3>'
+            f'<p>置信度 {float(event.get("confidence") or 0):.2f}</p>'
+            "</article>"
+        )
+    return '<section><h2>截止事项</h2><div class="grid">' + "\n".join(rows) + "</div></section>"
 
 
 def render_repo_cards(repos: list[dict[str, Any]]) -> str:

@@ -26,7 +26,7 @@ def configure_from_ccswitch(force_fallback: bool = False) -> Optional[dict[str, 
 
 def select_provider(force_fallback: bool = False) -> dict[str, Any]:
     db_path = Path(os.getenv("CCSWITCH_DB", "~/.cc-switch/cc-switch.db")).expanduser()
-    fallback_path = Path(os.getenv("CCSWITCH_FALLBACK_FILE", "~/.cc-switch/fallback-provider.json")).expanduser()
+    fallback_path = Path(os.getenv("CCSWITCH_FALLBACK_FILE", "~/.cc-switch/mimo-codex-provider.json")).expanduser()
     timeout = float(os.getenv("CCSWITCH_TIMEOUT", "10"))
     min_balance = float(os.getenv("CCSWITCH_MIN_BALANCE", "0"))
     fallback_min_balance = float(os.getenv("CCSWITCH_FALLBACK_MIN_BALANCE", "0"))

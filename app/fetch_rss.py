@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -27,20 +28,36 @@ def fetch_rss_from_config(
     errors: list[dict[str, str]] = []
     runs: list[dict[str, Any]] = []
     global_keywords = list(config.get("industry", {}).get("priority_keywords") or [])
-    for source in config.get("rss", []) or []:
-        if not source.get("enabled", True):
-            continue
+    sources = [source for source in config.get("rss", []) or [] if source.get("enabled", True)]
+
+    def collect_one(source: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
         source_config = dict(source)
         source_config["priority_keywords"] = global_keywords + list(source.get("priority_keywords") or [])
         started_at = utc_now()
         started = time.perf_counter()
         try:
             source_entries = fetch_rss_source(source_config, today=today, timeout=timeout)
-            entries.extend(source_entries)
-            runs.append(source_run(source_config, "success", len(source_entries), None, started_at, elapsed_ms(started)))
+            return source_entries, [], source_run(source_config, "success", len(source_entries), None, started_at, elapsed_ms(started))
         except Exception as exc:
-            errors.append({"source_name": str(source.get("name") or source.get("url") or "rss"), "url": str(source.get("url") or ""), "error": str(exc)})
-            runs.append(source_run(source_config, "failed", 0, str(exc), started_at, elapsed_ms(started)))
+            error = {"source_name": str(source.get("name") or source.get("url") or "rss"), "url": str(source.get("url") or ""), "error": str(exc)}
+            return [], [error], source_run(source_config, "failed", 0, str(exc), started_at, elapsed_ms(started))
+
+    if not sources:
+        return [], [], []
+    workers = min(len(sources), int(config.get("rss_parallel_workers") or 4))
+    if workers <= 1:
+        results = [collect_one(source) for source in sources]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(collect_one, source): index for index, source in enumerate(sources)}
+            ordered: list[tuple[int, tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]]] = []
+            for future in as_completed(futures):
+                ordered.append((futures[future], future.result()))
+            results = [result for _index, result in sorted(ordered, key=lambda item: item[0])]
+    for source_entries, source_errors, source_run_item in results:
+        entries.extend(source_entries)
+        errors.extend(source_errors)
+        runs.append(source_run_item)
     return dedupe_entries(entries), errors, runs
 
 

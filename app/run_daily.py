@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--send-only", action="store_true", help="Build and deliver a digest from stored candidates")
     parser.add_argument("--delivery-slot", default=None, help="Delivery slot key, defaults to YYYY-MM-DD-HH")
     parser.add_argument("--lark-only-important", action="store_true", help="Send only high-score items to Lark")
+    parser.add_argument("--incremental", action="store_true", help="In Lark important mode, send only newly discovered unnotified items")
     return parser.parse_args()
 
 

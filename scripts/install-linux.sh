@@ -5,10 +5,12 @@ install_root="${DAILY_BRIEF_ROOT:-/opt/daily-open-source-brief}"
 service_name="${DAILY_BRIEF_SERVICE_NAME:-daily-open-source-brief}"
 collect_service_name="${DAILY_BRIEF_COLLECT_SERVICE_NAME:-daily-open-source-brief-collect}"
 rotate_service_name="${DAILY_BRIEF_ROTATE_SERVICE_NAME:-daily-open-source-brief-llm-rotate}"
+weekly_service_name="${DAILY_BRIEF_WEEKLY_SERVICE_NAME:-daily-open-source-brief-weekly}"
 run_time="${DAILY_BRIEF_RUN_TIME:-06:00:00}"
 brief_interval="${DAILY_BRIEF_INTERVAL:-08,11,14,17,20,22:00:00}"
 collect_interval="${DAILY_BRIEF_COLLECT_INTERVAL:-*:00:00}"
 rotate_interval="${DAILY_BRIEF_ROTATE_INTERVAL:-*:0/30}"
+weekly_interval="${DAILY_BRIEF_WEEKLY_INTERVAL:-Mon *-*-* 08:30:00}"
 collect_model="${DAILY_BRIEF_COLLECT_MODEL:-gpt-5.4-mini}"
 send_model="${DAILY_BRIEF_SEND_MODEL:-gpt-5.5}"
 send_reasoning_effort="${DAILY_BRIEF_REASONING_EFFORT:-medium}"
@@ -79,7 +81,7 @@ Environment=DAILY_BRIEF_SEND_MODEL=${send_model}
 Environment=DAILY_BRIEF_REASONING_EFFORT=${send_reasoning_effort}
 EnvironmentFile=${install_root}/.env
 EnvironmentFile=-${install_root}/.llm.env
-ExecStart=${install_root}/.venv/bin/python -m app.run_daily --send-only
+ExecStart=${install_root}/.venv/bin/python -m app.run_daily --send-only --lark-only-important --incremental
 EOF
 
 cat >"/etc/systemd/system/${collect_service_name}.service" <<EOF
@@ -112,6 +114,20 @@ EnvironmentFile=${install_root}/.env
 ExecStart=${install_root}/.venv/bin/python -m app.rotate_llm_provider --env-out ${install_root}/.llm.env
 EOF
 
+cat >"/etc/systemd/system/${weekly_service_name}.service" <<EOF
+[Unit]
+Description=Generate weekly daily-open-source-brief report
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=${install_root}
+Environment=HOME=/root
+EnvironmentFile=${install_root}/.env
+ExecStart=${install_root}/.venv/bin/python -m app.cli weekly
+EOF
+
 cat >"/etc/systemd/system/${rotate_service_name}.timer" <<EOF
 [Unit]
 Description=Rotate daily open-source brief LLM provider every 30 minutes
@@ -121,6 +137,19 @@ OnBootSec=2min
 OnCalendar=${rotate_interval}
 Persistent=true
 RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
+EOF
+
+cat >"/etc/systemd/system/${weekly_service_name}.timer" <<EOF
+[Unit]
+Description=Generate weekly daily-open-source-brief report
+
+[Timer]
+OnCalendar=${weekly_interval}
+Persistent=true
+RandomizedDelaySec=300
 
 [Install]
 WantedBy=timers.target
@@ -156,8 +185,10 @@ systemctl daemon-reload
 systemctl enable --now "${service_name}.timer"
 systemctl enable --now "${collect_service_name}.timer"
 systemctl enable --now "${rotate_service_name}.timer"
+systemctl enable --now "${weekly_service_name}.timer"
 
 echo "Installed ${service_name}.timer"
 echo "Installed ${collect_service_name}.timer"
 echo "Installed ${rotate_service_name}.timer"
+echo "Installed ${weekly_service_name}.timer"
 echo "Test: systemctl start ${service_name}.service && journalctl -u ${service_name}.service -n 80 --no-pager"

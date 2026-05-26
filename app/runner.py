@@ -35,6 +35,7 @@ class RunOptions:
     send_only: bool = False
     delivery_slot: str | None = None
     lark_only_important: bool = False
+    incremental: bool = False
 
     @classmethod
     def from_namespace(cls, args: Namespace) -> "RunOptions":
@@ -56,6 +57,7 @@ class RunOptions:
             "send_only": self.send_only,
             "delivery_slot": self.delivery_slot,
             "lark_only_important": self.lark_only_important,
+            "incremental": self.incremental,
         }
 
 
@@ -135,9 +137,10 @@ def run(options: RunOptions) -> int:
         if not options.send_only:
             apply_model_override("DAILY_BRIEF_COLLECT_MODEL")
             manager.run_stage("collector", ctx)
+            manager.run_stage("enricher", ctx)
             ctx.state["web_items"] = sorted(
                 ctx.state.get("web_items", []),
-                key=lambda item: (item.get("_score", 0), item.get("published_at") or ""),
+                key=lambda item: (item.get("_effective_score", item.get("_score", 0)), item.get("published_at") or ""),
                 reverse=True,
             )
             if options.collect_only:
@@ -145,6 +148,7 @@ def run(options: RunOptions) -> int:
                 return 0
         else:
             load_stored_candidates(ctx)
+            manager.run_stage("enricher", ctx)
 
         ctx.state["source_health"] = db.load_source_health(conn)
         manager.run_stage("provider", ctx)

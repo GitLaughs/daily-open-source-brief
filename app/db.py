@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 
+SCHEMA_VERSION = 3
+
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS items (
   title TEXT NOT NULL,
   url TEXT NOT NULL,
   content_snippet TEXT NOT NULL DEFAULT '',
+  content_full TEXT,
   raw_json TEXT NOT NULL DEFAULT '{}',
   hash TEXT NOT NULL,
   published_at TEXT,
@@ -71,6 +74,23 @@ CREATE TABLE IF NOT EXISTS item_feedback (
 CREATE INDEX IF NOT EXISTS idx_item_tags_item_id ON item_tags(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_feedback_item_id ON item_feedback(item_id);
 CREATE INDEX IF NOT EXISTS idx_item_feedback_type_value ON item_feedback(feedback_type, value);
+
+CREATE TABLE IF NOT EXISTS deadline_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER,
+  title TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  deadline TEXT NOT NULL,
+  confidence REAL NOT NULL DEFAULT 0,
+  location TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  lark_task_id TEXT,
+  source_url TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_deadline_events_deadline ON deadline_events(deadline);
+CREATE INDEX IF NOT EXISTS idx_deadline_events_status ON deadline_events(status);
 
 CREATE TABLE IF NOT EXISTS repo_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,13 +241,53 @@ def connect(path: Path) -> sqlite3.Connection:
 
 
 def ensure_migrations(conn: sqlite3.Connection) -> None:
+    current = int(conn.execute("PRAGMA user_version").fetchone()[0])
+    if current < 1:
+        migrate_v1(conn)
+    if current < 2:
+        migrate_v2(conn)
+    if current < 3:
+        migrate_v3(conn)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    backfill_items_fts(conn)
+
+
+def migrate_v1(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
     for name in ["first_seen_at", "last_seen_at", "last_notified_slot"]:
         if name not in columns:
             conn.execute(f"ALTER TABLE items ADD COLUMN {name} TEXT")
     conn.execute("UPDATE items SET first_seen_at = COALESCE(first_seen_at, fetched_at)")
     conn.execute("UPDATE items SET last_seen_at = COALESCE(last_seen_at, fetched_at)")
-    backfill_items_fts(conn)
+
+
+def migrate_v2(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deadline_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          item_id INTEGER,
+          title TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          deadline TEXT NOT NULL,
+          confidence REAL NOT NULL DEFAULT 0,
+          location TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          lark_task_id TEXT,
+          source_url TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_deadline_events_deadline ON deadline_events(deadline)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_deadline_events_status ON deadline_events(status)")
+
+
+def migrate_v3(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
+    if "content_full" not in columns:
+        conn.execute("ALTER TABLE items ADD COLUMN content_full TEXT")
 
 
 def backfill_items_fts(conn: sqlite3.Connection) -> None:
@@ -291,18 +351,20 @@ def upsert_item(conn: sqlite3.Connection, item: dict[str, Any]) -> int:
     item.setdefault("first_seen_at", seen_at)
     item["last_seen_at"] = seen_at
     item.setdefault("last_notified_slot", None)
+    item.setdefault("content_full", None)
     conn.execute(
         """
-        INSERT INTO items(source_id, source_type, title, url, content_snippet, raw_json, hash,
+        INSERT INTO items(source_id, source_type, title, url, content_snippet, content_full, raw_json, hash,
                           published_at, fetched_at, first_seen_at, last_seen_at, last_notified_slot,
                           score, status)
-        VALUES(:source_id, :source_type, :title, :url, :content_snippet, :raw_json, :hash,
+        VALUES(:source_id, :source_type, :title, :url, :content_snippet, :content_full, :raw_json, :hash,
                :published_at, :fetched_at, :first_seen_at, :last_seen_at, :last_notified_slot,
                :score, :status)
         ON CONFLICT(source_type, hash) DO UPDATE SET
           title=excluded.title,
           url=excluded.url,
           content_snippet=excluded.content_snippet,
+          content_full=excluded.content_full,
           raw_json=excluded.raw_json,
           published_at=excluded.published_at,
           fetched_at=excluded.fetched_at,
@@ -319,6 +381,88 @@ def upsert_item(conn: sqlite3.Connection, item: dict[str, Any]) -> int:
     item_id = int(row["id"])
     sync_item_fts(conn, item_id)
     return item_id
+
+
+def upsert_deadline_event(conn: sqlite3.Connection, event: dict[str, Any]) -> int:
+    now = utc_now()
+    event.setdefault("created_at", now)
+    event["updated_at"] = now
+    row = conn.execute(
+        """
+        SELECT id FROM deadline_events
+        WHERE item_id IS ? AND title = ? AND event_type = ? AND deadline = ?
+        LIMIT 1
+        """,
+        (event.get("item_id"), event["title"], event["event_type"], event["deadline"]),
+    ).fetchone()
+    if row:
+        conn.execute(
+            """
+            UPDATE deadline_events
+            SET confidence=?, location=?, status=?, lark_task_id=?, source_url=?, updated_at=?
+            WHERE id=?
+            """,
+            (
+                float(event.get("confidence") or 0),
+                event.get("location"),
+                event.get("status") or "pending",
+                event.get("lark_task_id"),
+                event.get("source_url"),
+                event["updated_at"],
+                int(row["id"]),
+            ),
+        )
+        return int(row["id"])
+    conn.execute(
+        """
+        INSERT INTO deadline_events(item_id, title, event_type, deadline, confidence,
+                                    location, status, lark_task_id, source_url, created_at, updated_at)
+        VALUES(:item_id, :title, :event_type, :deadline, :confidence,
+               :location, :status, :lark_task_id, :source_url, :created_at, :updated_at)
+        """,
+        {
+            "item_id": event.get("item_id"),
+            "title": event["title"],
+            "event_type": event["event_type"],
+            "deadline": event["deadline"],
+            "confidence": float(event.get("confidence") or 0),
+            "location": event.get("location"),
+            "status": event.get("status") or "pending",
+            "lark_task_id": event.get("lark_task_id"),
+            "source_url": event.get("source_url"),
+            "created_at": event["created_at"],
+            "updated_at": event["updated_at"],
+        },
+    )
+    row = conn.execute(
+        """
+        SELECT id FROM deadline_events
+        WHERE item_id IS ? AND title = ? AND event_type = ? AND deadline = ?
+        ORDER BY id DESC LIMIT 1
+        """,
+        (event.get("item_id"), event["title"], event["event_type"], event["deadline"]),
+    ).fetchone()
+    return int(row["id"])
+
+
+def load_deadline_events(conn: sqlite3.Connection, *, status: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+    params: list[Any] = []
+    where = ""
+    if status:
+        where = "WHERE status = ?"
+        params.append(status)
+    rows = conn.execute(
+        f"""
+        SELECT id, item_id, title, event_type, deadline, confidence, location,
+               status, lark_task_id, source_url, created_at, updated_at
+        FROM deadline_events
+        {where}
+        ORDER BY deadline ASC, confidence DESC
+        LIMIT ?
+        """,
+        (*params, limit),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def upsert_repo_snapshot(conn: sqlite3.Connection, repo: dict[str, Any], snapshot_date: str) -> None:
@@ -773,6 +917,22 @@ def mark_items_notified(conn: sqlite3.Connection, item_ids: Iterable[int], deliv
         (delivery_slot, *ids),
     )
     return int(cursor.rowcount)
+
+
+def load_item_notification_meta(conn: sqlite3.Connection, item_ids: Iterable[int]) -> dict[int, dict[str, Any]]:
+    ids = [int(item_id) for item_id in item_ids if item_id is not None]
+    if not ids:
+        return {}
+    placeholders = ",".join("?" for _ in ids)
+    rows = conn.execute(
+        f"""
+        SELECT id, first_seen_at, last_seen_at, fetched_at, last_notified_slot, score
+        FROM items
+        WHERE id IN ({placeholders})
+        """,
+        ids,
+    ).fetchall()
+    return {int(row["id"]): dict(row) for row in rows}
 
 
 def log_mail(

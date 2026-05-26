@@ -15,12 +15,18 @@ from .registry import PluginRegistry, default_order
 DEFAULT_PLUGINS: dict[str, dict[str, Any]] = {
     "ccswitch": {"kind": "provider", "enabled": True},
     "github": {"kind": "collector", "enabled": True, "limit": 40},
+    "github_trending": {"kind": "collector", "enabled": False, "limit": 10},
     "webpage": {"kind": "collector", "enabled": True},
     "rss": {"kind": "collector", "enabled": True},
+    "feedback": {"kind": "enricher", "enabled": True},
+    "deadline": {"kind": "enricher", "enabled": True},
+    "cross_source_dedupe": {"kind": "enricher", "enabled": False},
+    "lark_digest": {"kind": "enricher", "enabled": True},
     "summarizer": {"kind": "summarizer", "enabled": True},
     "renderer": {"kind": "renderer", "enabled": True},
     "lark": {"kind": "sender", "enabled": True},
     "mail": {"kind": "sender", "enabled": True},
+    "webhook": {"kind": "sender", "enabled": False},
 }
 
 

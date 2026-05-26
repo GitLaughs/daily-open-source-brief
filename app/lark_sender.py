@@ -20,10 +20,60 @@ def lark_receive_id() -> str:
 
 
 def digest_markdown(title: str, text_content: str, archive_path: Optional[Path] = None) -> str:
+    full = build_full_markdown(title, text_content, archive_path)
+    max_chars = int(os.getenv("LARK_MAX_MARKDOWN_CHARS", str(DEFAULT_LARK_MAX_CHARS)))
+    if max_chars <= 0 or len(full) <= max_chars:
+        return full
+    return build_summary_markdown(title, text_content, archive_path, max_chars)
+
+
+def build_full_markdown(title: str, text_content: str, archive_path: Optional[Path] = None) -> str:
     lines = [f"## {title}", "", text_content.strip()]
     if archive_path:
         lines.extend(["", f"归档：`{archive_path}`"])
     return "\n".join(lines).strip() + "\n"
+
+
+def build_summary_markdown(title: str, text_content: str, archive_path: Optional[Path], max_chars: int) -> str:
+    priority = extract_priority_section(text_content)
+    lines = [f"## {title}", "", priority.strip()]
+    if archive_path:
+        lines.extend(["", f"完整归档：`{archive_path}`"])
+    summary = "\n".join(line for line in lines if line is not None).strip()
+    if len(summary) <= max_chars:
+        return summary + "\n"
+    reserve = 0
+    archive_line = ""
+    if archive_path:
+        archive_line = f"\n\n完整归档：`{archive_path}`"
+        reserve = len(archive_line)
+    head = f"## {title}\n\n"
+    body_limit = max(max_chars - len(head) - reserve - 1, 0)
+    result = (head + priority[:body_limit].rstrip() + archive_line).strip()
+    if len(result) >= max_chars:
+        result = result[: max_chars - 1].rstrip()
+    return result + "\n"
+
+
+def extract_priority_section(text_content: str) -> str:
+    lines = text_content.strip().splitlines()
+    if not lines:
+        return ""
+    start = 0
+    for index, line in enumerate(lines):
+        if line.strip().startswith("## 今日优先处理"):
+            start = index
+            break
+    selected: list[str] = []
+    for line in lines[start:]:
+        if selected and line.startswith("## "):
+            break
+        selected.append(line)
+    if selected:
+        item_count = sum(1 for line in selected if line.strip().startswith("- "))
+        if item_count >= 3 or len(selected) >= 8:
+            return "\n".join(selected)
+    return "\n".join(lines[:20])
 
 
 def split_markdown(markdown: str, max_chars: int = DEFAULT_LARK_MAX_CHARS) -> list[str]:

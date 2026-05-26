@@ -16,10 +16,10 @@ class RenderTests(unittest.TestCase):
         self.assertIn("</ul>", html)
         self.assertIn('<a href="https://example.com">https://example.com</a>', html)
 
-    def test_render_email_contains_web_and_repo_sections(self):
+    def test_render_email_contains_school_and_repo_sections(self):
         html = render_email(
             date(2026, 5, 25),
-            "# Daily Brief\n\n## Priority Items\n- [Example Campus] Registration notice\n  Link: https://example.edu/notice/1.htm",
+            "# 今日个人日报\n\n## 今日优先处理\n- [教务处] 选课通知\n  链接：https://jwc.xjtu.edu.cn/info/1.htm",
             [
                 {
                     "full_name": "owner/repo",
@@ -34,15 +34,15 @@ class RenderTests(unittest.TestCase):
             "template",
             web_items=[
                 {
-                    "source_title": "Example Campus Notices",
-                    "title": "Registration notice",
-                    "url": "https://example.edu/notice/1.htm",
+                    "source_title": "西安交大教务处 教学通知",
+                    "title": "选课通知",
+                    "url": "https://jwc.xjtu.edu.cn/info/1.htm",
                     "published_at": "2026-05-25",
-                    "content_snippet": "Submit before the deadline.",
+                    "content_snippet": "请按时处理",
                 }
             ],
         )
-        self.assertIn("开源与工程日报", html)
+        self.assertIn("个人技术与产业日报", html)
         self.assertIn("网页与 RSS 情报源", html)
         self.assertIn("开源项目速览", html)
 

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>开源日报 {{ digest_date.isoformat() }}</title>
+  <style>
+    :root {
+      --color-primary: #0f766e;
+      --color-secondary: #2563eb;
+      --color-neutral-50: #f8f9fa;
+      --color-neutral-100: #f3f4f6;
+      --color-neutral-200: #e5e7eb;
+      --color-neutral-500: #6b7280;
+      --color-neutral-600: #4b5563;
+      --color-neutral-900: #111827;
+      --color-warning: #b45309;
+      --radius-card: 8px;
+    }
+    body { margin: 0; background: var(--color-neutral-100); color: var(--color-neutral-900); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; font-size: 16px; line-height: 1.5; }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 16px 48px; background: #ffffff; }
+    header { border-bottom: 1px solid var(--color-neutral-200); padding-bottom: 24px; margin-bottom: 24px; }
+    h1 { font-size: 32px; line-height: 1.25; margin: 0 0 8px; font-weight: 600; }
+    h2 { font-size: 20px; line-height: 1.25; margin: 32px 0 16px; font-weight: 600; }
+    h3 { font-size: 16px; line-height: 1.25; margin: 0 0 8px; font-weight: 600; }
+    p { margin: 0 0 12px; }
+    a { color: var(--color-secondary); text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--color-neutral-200); padding: 12px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--color-neutral-600); font-weight: 600; background: var(--color-neutral-50); }
+    .meta { color: var(--color-neutral-500); font-size: 14px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 24px; }
+    .metric { border: 1px solid var(--color-neutral-200); border-radius: var(--radius-card); padding: 16px; background: #ffffff; }
+    .metric span { display: block; color: var(--color-neutral-500); font-size: 12px; }
+    .metric strong { display: block; margin-top: 4px; font-size: 24px; line-height: 1.25; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .item-card { border: 1px solid var(--color-neutral-200); border-radius: var(--radius-card); padding: 16px; background: #ffffff; }
+    .item-card p { color: var(--color-neutral-600); font-size: 14px; }
+    .tagline { display: flex; gap: 8px; flex-wrap: wrap; color: var(--color-neutral-500); font-size: 12px; margin-bottom: 8px; }
+    .tag { border: 1px solid var(--color-neutral-200); border-radius: 6px; padding: 4px 8px; background: var(--color-neutral-50); }
+    .digest { border: 1px solid var(--color-neutral-200); border-radius: var(--radius-card); padding: 24px; background: var(--color-neutral-50); }
+    .digest h1 { font-size: 24px; }
+    .digest h2 { font-size: 16px; margin-top: 24px; border-bottom: 1px solid var(--color-neutral-200); padding-bottom: 8px; }
+    .digest-list { margin: 0; padding-left: 24px; }
+    .digest-list li { margin: 12px 0; }
+    .digest-list p { color: var(--color-neutral-600); font-size: 14px; margin: 4px 0 0; }
+    .health { color: var(--color-warning); font-size: 14px; }
+    @media (max-width: 680px) {
+      main { padding: 24px 12px 32px; }
+      .metrics, .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 24px; }
+      table { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="meta">生成日期：{{ digest_date.isoformat() }} · 摘要模式：{{ mode }}</div>
+    <h1>个人技术与产业日报</h1>
+    {% include "partials/metrics.html" %}
+  </header>
+  <section>
+    <h2>今日简报</h2>
+    {% include "partials/digest.html" %}
+  </section>
+  {% include "partials/deadlines.html" %}
+  <section>
+    <h2>网页与 RSS 情报源</h2>
+    {% include "partials/web_cards.html" %}
+  </section>
+  <section>
+    <h2>开源项目速览</h2>
+    {% include "partials/repo_cards.html" %}
+  </section>
+  {% include "partials/health.html" %}
+  <h2>候选仓库快照</h2>
+  {% include "partials/table.html" %}
+</main>
+</body>
+</html>

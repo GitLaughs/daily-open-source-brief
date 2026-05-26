@@ -39,6 +39,14 @@ class LarkSenderTests(unittest.TestCase):
         self.assertIn("--user-id", calls[0])
         self.assertIn("ou_demo", calls[0])
 
+    def test_digest_markdown_degrades_when_too_long(self):
+        text = "# 今日个人日报\n\n## 今日优先处理\n" + "\n".join(f"- item {i}" for i in range(5)) + "\n\n## 其它\n" + ("长正文" * 100)
+        with patch.dict("app.lark_sender.os.environ", {"LARK_MAX_MARKDOWN_CHARS": "160"}, clear=True):
+            markdown = lark_sender.digest_markdown("日报", text)
+
+        self.assertLessEqual(len(markdown), 161)
+        self.assertIn("今日优先处理", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()

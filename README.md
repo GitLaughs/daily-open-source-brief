@@ -4,6 +4,8 @@ Plugin-based daily brief generator for GitHub projects, RSS feeds, public webpag
 
 Keywords: open-source brief, GitHub trending digest, RSS digest, webpage collector, SQLite FTS5, knowledge base, plugin pipeline, Lark sender, email digest, Python automation, daily report.
 
+中文文档: [README.zh-CN.md](README.zh-CN.md)
+
 `daily-open-source-brief` turns noisy public sources into a searchable daily digest:
 
 - collector plugins fetch GitHub repositories, RSS/Atom feeds, and public webpage lists;
@@ -13,7 +15,8 @@ Keywords: open-source brief, GitHub trending digest, RSS digest, webpage collect
 - sender plugins can deliver through SMTP or Lark when configured locally;
 - SQLite stores items, source health, plugin runs, feedback, tags, and digest history;
 - FTS5 search makes collected items reusable from CLI now and a future web console later;
-- feedback marks support favorite, read, later, blocked, and not-interested states.
+- feedback marks support favorite, read, later, blocked, and not-interested states;
+- Windows users get a one-command installer, test script, and optional scheduled task registration.
 
 This repository contains source code, templates, tests, and generic example configuration only. It does not contain runtime databases, local profiles, API keys, private user IDs, private chat IDs, server addresses, generated archives, or local `.env` files.
 
@@ -32,6 +35,7 @@ This project keeps those jobs separate through a plugin pipeline:
 |---|---|
 | `provider` | Configure LLM/provider runtime |
 | `collector` | Fetch GitHub, RSS, and webpage candidates |
+| `enricher` | Apply feedback weights, dedupe, deadlines, and Lark digest filtering |
 | `summarizer` | Generate digest text |
 | `renderer` | Save digest records and HTML archive |
 | `sender` | Deliver through configured channels |
@@ -57,17 +61,22 @@ flowchart LR
 ## Features
 
 - Plugin registry and config-driven pipeline in `config/plugins.yml`.
-- Built-in collectors for GitHub repositories, RSS/Atom entries, and public webpage list pages.
+- Built-in collectors for GitHub repositories, optional GitHub Trending, RSS/Atom entries, and public webpage list pages.
+- Enricher plugins for feedback weights, deadline extraction, cross-source dedupe, and important-item Lark digests.
 - Local plugin loading from `plugins/local/*.py`.
-- SQLite persistence for sources, items, repo snapshots, digests, source runs, plugin health, tags, and feedback.
+- SQLite persistence for sources, items, repo snapshots, digests, source runs, plugin health, tags, feedback, and deadline events.
 - SQLite FTS5 search index for item title, snippet, URL, and source type.
 - Knowledge API in `app/knowledge.py` for CLI and future web-console reuse.
 - Knowledge CLI for search, recent items, saved items, marks, and tags.
+- Weekly metrics and lightweight Lark bot helpers backed by SQLite state.
 - Existing `app.brief_cli` entry kept for compatibility.
 - Deterministic fallback summaries when LLM configuration is absent.
 - Optional OpenAI-compatible LLM configuration.
 - Optional SMTP and Lark delivery.
+- Optional Webhook delivery.
 - HTML archive generation with retention cleanup.
+- HTML email rendering through Jinja templates.
+- Windows onboarding scripts and GitHub Actions CI.
 - Unit tests for collectors, rendering, plugin management, FTS, knowledge operations, and CLI behavior.
 
 ## Requirements
@@ -95,6 +104,13 @@ python -m pip install -r requirements.txt
 
 ## Quick Start
 
+Windows one-command setup:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
 Run an offline sample without sending messages:
 
 ```powershell
@@ -121,6 +137,11 @@ python -m app.cli plugin disable rss
 python -m app.cli plugin enable rss
 python -m app.cli plugin status
 ```
+
+Windows workflow docs:
+
+- [Windows install guide](docs/install-windows.md)
+- [Chinese workflow guide](docs/workflow-zh.md)
 
 ## Configuration
 
@@ -195,8 +216,15 @@ python -m app.cli kb saved
 ## Verify
 
 ```powershell
+python -m pytest
 python -m unittest discover -s tests -v
 git diff --check
+```
+
+Windows all-in-one check:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
 ```
 
 Expected:
@@ -205,6 +233,7 @@ Expected:
 - plugin registry and plugin health tests pass;
 - FTS search tests pass;
 - knowledge mark/tag/saved tests pass;
+- deadline, dedupe, feedback, retry, weekly metrics, and sender tests pass;
 - CLI tests pass.
 
 ## Security

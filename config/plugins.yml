@@ -8,12 +8,33 @@ plugins:
     enabled: true
     limit: 40
 
+  github_trending:
+    kind: collector
+    enabled: false
+    limit: 10
+
   webpage:
     kind: collector
     enabled: true
 
   rss:
     kind: collector
+    enabled: true
+
+  feedback:
+    kind: enricher
+    enabled: true
+
+  deadline:
+    kind: enricher
+    enabled: true
+
+  cross_source_dedupe:
+    kind: enricher
+    enabled: false
+
+  lark_digest:
+    kind: enricher
     enabled: true
 
   summarizer:
@@ -31,3 +52,7 @@ plugins:
   mail:
     kind: sender
     enabled: true
+
+  webhook:
+    kind: sender
+    enabled: false

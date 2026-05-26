@@ -39,6 +39,46 @@ class DbTests(unittest.TestCase):
                 self.assertEqual(stored["score"], 2)
                 self.assertEqual(stored["first_seen_at"], first_seen)
                 self.assertEqual(stored["last_seen_at"], "2026-05-26T00:00:00+00:00")
+                self.assertGreaterEqual(conn.execute("PRAGMA user_version").fetchone()[0], db.SCHEMA_VERSION)
+            finally:
+                conn.close()
+
+    def test_deadline_events_crud(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = db.connect(Path(tmp) / "brief.sqlite")
+            try:
+                event_id = db.upsert_deadline_event(
+                    conn,
+                    {
+                        "item_id": 1,
+                        "title": "选课确认",
+                        "event_type": "确认",
+                        "deadline": "2026-06-05",
+                        "confidence": 0.9,
+                        "source_url": "https://example.com",
+                        "status": "pending",
+                    },
+                )
+                second_id = db.upsert_deadline_event(
+                    conn,
+                    {
+                        "item_id": 1,
+                        "title": "选课确认",
+                        "event_type": "确认",
+                        "deadline": "2026-06-05",
+                        "confidence": 0.7,
+                        "source_url": "https://example.com",
+                        "status": "pending",
+                    },
+                )
+                events = db.load_deadline_events(conn)
+
+                self.assertEqual(event_id, second_id)
+                self.assertEqual(len(events), 1)
+                self.assertEqual(events[0]["confidence"], 0.7)
             finally:
                 conn.close()
 

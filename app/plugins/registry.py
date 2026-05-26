@@ -10,7 +10,7 @@ from ..config import load_yaml_config
 from .base import BasePlugin
 
 
-VALID_KINDS = {"provider", "collector", "summarizer", "renderer", "sender"}
+VALID_KINDS = {"provider", "collector", "enricher", "summarizer", "renderer", "sender"}
 
 
 @dataclass
@@ -85,6 +85,7 @@ def default_order(kind: str) -> int:
     return {
         "provider": 10,
         "collector": 30,
+        "enricher": 40,
         "summarizer": 50,
         "renderer": 70,
         "sender": 90,

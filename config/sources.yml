@@ -1,4 +1,13 @@
 github:
+  trending:
+    enabled: false
+    languages:
+      - python
+      - rust
+      - typescript
+      - go
+    since: daily
+    limit: 10
   queries:
     - name: high-star-active
       q: "stars:>5000 pushed:>{pushed_after} archived:false fork:false"
@@ -12,28 +21,43 @@ github:
     - name: self-hosted-active
       q: "topic:self-hosted stars:>1000 pushed:>{pushed_after} archived:false fork:false"
       limit: 20
-    - name: data-tools-active
-      q: "data tools stars:>500 pushed:>{pushed_after} archived:false fork:false"
+    - name: open-eda-active
+      q: "eda stars:>100 pushed:>{pushed_after} archived:false fork:false"
       limit: 20
-    - name: devops-active
-      q: "topic:devops stars:>1000 pushed:>{pushed_after} archived:false fork:false"
+    - name: semiconductor-active
+      q: "semiconductor stars:>50 pushed:>{pushed_after} archived:false fork:false"
       limit: 20
-    - name: security-active
-      q: "topic:security stars:>1000 pushed:>{pushed_after} archived:false fork:false"
+    - name: verilog-active
+      q: "verilog stars:>100 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: spice-active
+      q: "spice circuit stars:>50 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
+    - name: ai-eda-active
+      q: "ai eda stars:>50 pushed:>{pushed_after} archived:false fork:false"
       limit: 20
     - name: prompts-templates-active
       q: "prompt templates stars:>100 pushed:>{pushed_after} archived:false fork:false"
       limit: 20
+    - name: document-generation-active
+      q: "document generation ai stars:>100 pushed:>{pushed_after} archived:false fork:false"
+      limit: 20
 topics:
   include:
     - ai
+    - analog
+    - asic
+    - chip-design
+    - self-hosted
+    - developer-tools
     - automation
     - cli
-    - developer-tools
     - infra
-    - observability
-    - security
-    - self-hosted
+    - eda
+    - fpga
+    - semiconductor
+    - spice
+    - verilog
 languages:
   include:
     - Python
@@ -41,22 +65,68 @@ languages:
     - Go
     - Rust
     - JavaScript
-    - Java
-public_notices:
+    - C
+    - C++
+    - Verilog
+    - SystemVerilog
+school:
   priority_keywords:
-    - registration
-    - deadline
-    - application
-    - maintenance
-news:
+    - 选课
+    - 考试
+    - 毕业
+    - 报名
+    - 申报
+    - 确认
+    - 答辩
+    - 奖学金
+industry:
   priority_keywords:
-    - AI
-    - automation
-    - developer tools
-    - open source
-    - security
-    - infrastructure
+    - semiconductor
+    - chip
+    - analog
+    - EDA
+    - verification
+    - packaging
+    - foundry
+    - FPGA
+    - AI accelerator
+webpage_parallel_workers: 4
+rss_parallel_workers: 4
 rss:
+  - name: semiconductor-engineering
+    title: Semiconductor Engineering
+    url: https://semiengineering.com/feed/
+    source_type: industry_news
+    category: semiconductor
+    enabled: true
+    limit: 10
+    weight: 8
+    tags:
+      - semiconductor
+      - eda
+      - industry
+    priority_keywords:
+      - EDA
+      - verification
+      - design
+      - manufacturing
+  - name: edn
+    title: EDN
+    url: https://www.edn.com/feed/
+    source_type: industry_news
+    category: electronics
+    enabled: true
+    limit: 10
+    weight: 5
+    tags:
+      - electronics
+      - analog
+      - embedded
+    priority_keywords:
+      - analog
+      - circuit
+      - power
+      - embedded
   - name: ieee-spectrum
     title: IEEE Spectrum
     url: https://spectrum.ieee.org/rss/fulltext
@@ -73,19 +143,98 @@ rss:
       - chip
       - robotics
       - computing
-webpages:
-  - name: example-public-notices
-    title: Example Public Notices
-    url: https://example.edu/notices/
-    source_type: public_notice
-    category: notices
+  - name: arxiv-cs-ai
+    title: arXiv CS.AI
+    url: https://rss.arxiv.org/rss/cs.AI
+    source_type: academic_paper
+    category: research
     enabled: false
+    limit: 10
+    weight: 6
+    priority_keywords:
+      - EDA
+      - chip design
+      - semiconductor
+      - circuit
+webpages:
+  - name: xjtu-jwc-teaching-notice
+    title: 西安交大教务处 教学通知
+    url: https://jwc.xjtu.edu.cn/jxxx/jxtz2.htm
+    source_type: school_notice
+    category: academic
+    enabled: true
+    fetch_detail: false
+    detail_max_chars: 2000
+    detail_timeout: 10
     limit: 12
+    weight: 8
+    url_allow_patterns:
+      - /info/
+    priority_keywords:
+      - 选课
+      - 考试
+      - 课程
+      - 本科
+      - 暑期学校
+      - 课程思政
+      - 劳动教育
+  - name: xjtu-graduate-notice
+    title: 西安交大研究生院 通知公告
+    url: https://gs.xjtu.edu.cn/tzgg.htm
+    source_type: school_notice
+    category: graduate
+    enabled: true
+    fetch_detail: false
+    detail_max_chars: 2000
+    detail_timeout: 10
+    limit: 12
+    weight: 7
+    url_allow_patterns:
+      - /info/
+    priority_keywords:
+      - 研究生
+      - 博士
+      - 培养
+      - 开题
+      - 答辩
+      - 课程
+      - 竞赛
+  - name: xjtu-student-affairs-notice
+    title: 西安交大学工部 通知公告
+    url: https://xsc.xjtu.edu.cn/xgdt/tzgg.htm
+    source_type: school_notice
+    category: student_affairs
+    enabled: true
+    fetch_detail: false
+    detail_max_chars: 2000
+    detail_timeout: 10
+    limit: 10
     weight: 5
     url_allow_patterns:
-      - /notice/
+      - /info/
     priority_keywords:
-      - registration
-      - deadline
-      - exam
-      - application
+      - 毕业
+      - 助学
+      - 奖学金
+      - 贷款
+      - 就业
+      - 书院
+  - name: xjtu-news-home
+    title: 西安交大新闻网
+    url: https://news.xjtu.edu.cn/
+    source_type: school_notice
+    category: campus_news
+    enabled: true
+    fetch_detail: false
+    detail_max_chars: 2000
+    detail_timeout: 10
+    limit: 10
+    weight: 2
+    url_allow_patterns:
+      - /info/
+    priority_keywords:
+      - 交叉
+      - 创新
+      - 科研
+      - 就业
+      - 学科
