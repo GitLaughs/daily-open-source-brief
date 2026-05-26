@@ -8,9 +8,8 @@ from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Iterable, Optional
 
-import requests
-
 from .fetch_webpage import DEFAULT_USER_AGENT, dedupe_entries, normalize_space, strip_tags
+from .http_client import http_get
 
 
 def utc_now() -> str:
@@ -63,7 +62,7 @@ def fetch_rss_from_config(
 
 def fetch_rss_source(source: dict[str, Any], *, today: date, timeout: int = 18) -> list[dict[str, Any]]:
     url = str(source["url"])
-    response = requests.get(
+    response = http_get(
         url,
         headers={"User-Agent": DEFAULT_USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"},
         timeout=timeout,
@@ -89,6 +88,13 @@ def parse_rss_entries(xml_text: str, source: dict[str, Any], *, today: date) -> 
         items = root.findall(".//item")
         for item in items:
             entry = entry_from_rss_item(item, source, source_name, source_title, fetched_at, today)
+            if entry:
+                entries.append(entry)
+    elif local_name(root.tag) == "RDF":
+        for item in root.iter():
+            if local_name(item.tag) != "item":
+                continue
+            entry = entry_from_rdf_item(item, source, source_name, source_title, fetched_at, today)
             if entry:
                 entries.append(entry)
     elif local_name(root.tag) == "feed":
@@ -138,6 +144,29 @@ def entry_from_atom_item(
     published_at = parse_feed_date(child_text(item, "published") or child_text(item, "updated"))
     description = clean_text(child_text(item, "summary") or child_text(item, "content"))
     guid = clean_text(child_text(item, "id")) or url
+    return make_entry(source, source_name, source_title, title, url, description, published_at, fetched_at, guid, today)
+
+
+def entry_from_rdf_item(
+    item: ET.Element,
+    source: dict[str, Any],
+    source_name: str,
+    source_title: str,
+    fetched_at: str,
+    today: date,
+) -> Optional[dict[str, Any]]:
+    title = clean_text(child_text(item, "title"))
+    url = clean_text(child_text(item, "link") or child_text(item, "url") or rdf_about(item))
+    if not title or not url:
+        return None
+    published_at = parse_feed_date(
+        child_text(item, "date")
+        or child_text(item, "published")
+        or child_text(item, "updated")
+        or child_text(item, "coverDate")
+    )
+    description = clean_text(child_text(item, "description") or child_text(item, "encoded") or child_text(item, "source"))
+    guid = clean_text(child_text(item, "identifier")) or url
     return make_entry(source, source_name, source_title, title, url, description, published_at, fetched_at, guid, today)
 
 
@@ -274,6 +303,13 @@ def atom_link(item: ET.Element) -> str:
         if href and not fallback:
             fallback = href
     return fallback
+
+
+def rdf_about(item: ET.Element) -> str:
+    for key, value in item.attrib.items():
+        if local_name(key) == "about" and value:
+            return value
+    return ""
 
 
 def clean_text(value: str) -> str:

@@ -172,6 +172,12 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=
 ```
 
+Public source fetches ignore system proxy settings by default. If a host must use `HTTP_PROXY`/`HTTPS_PROXY`, opt in explicitly:
+
+```text
+DAILY_BRIEF_TRUST_ENV_PROXY=1
+```
+
 Optional Lark delivery:
 
 ```text

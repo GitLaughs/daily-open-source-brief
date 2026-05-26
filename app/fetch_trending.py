@@ -3,16 +3,16 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import requests
 from bs4 import BeautifulSoup
 
 from .fetch_webpage import DEFAULT_USER_AGENT, normalize_space
+from .http_client import http_get
 
 
 def fetch_trending(language: str = "any", since: str = "daily", timeout: int = 15) -> list[dict[str, Any]]:
     path = "" if language in {"", "any", "all"} else f"/{language}"
     url = f"https://github.com/trending{path}?since={since}"
-    response = requests.get(url, headers={"User-Agent": DEFAULT_USER_AGENT, "Accept": "text/html"}, timeout=timeout)
+    response = http_get(url, headers={"User-Agent": DEFAULT_USER_AGENT, "Accept": "text/html"}, timeout=timeout)
     if response.status_code >= 400:
         raise RuntimeError(f"HTTP {response.status_code}")
     return parse_trending(response.text, language=language, since=since)

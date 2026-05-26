@@ -14,6 +14,8 @@ import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
+from .http_client import http_session
+
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (compatible; daily-open-source-brief/0.2; "
@@ -142,11 +144,11 @@ def source_run(
 
 def fetch_webpage_source(source: dict[str, Any], *, today: date, timeout: int = 25) -> list[dict[str, Any]]:
     url = str(source["url"])
-    session = requests.Session()
-    text = fetch_html(session, url, timeout=timeout)
-    entries = parse_webpage_entries(text, url, source, today=today)
-    if source.get("fetch_detail"):
-        enrich_detail_texts(session, entries, source, timeout=timeout)
+    with http_session() as session:
+        text = fetch_html(session, url, timeout=timeout)
+        entries = parse_webpage_entries(text, url, source, today=today)
+        if source.get("fetch_detail"):
+            enrich_detail_texts(session, entries, source, timeout=timeout)
     limit = int(source.get("limit", 12))
     return entries[:limit]
 

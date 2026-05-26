@@ -148,14 +148,146 @@ rss:
     url: https://rss.arxiv.org/rss/cs.AI
     source_type: academic_paper
     category: research
-    enabled: false
+    enabled: true
     limit: 10
     weight: 6
+    tags:
+      - arxiv
+      - paper
+      - ai
     priority_keywords:
       - EDA
       - chip design
       - semiconductor
       - circuit
+  - name: arxiv-cs-lg
+    title: arXiv CS.LG
+    url: https://rss.arxiv.org/rss/cs.LG
+    source_type: academic_paper
+    category: research
+    enabled: true
+    limit: 10
+    weight: 5
+    tags:
+      - arxiv
+      - paper
+      - machine-learning
+    priority_keywords:
+      - efficient
+      - agent
+      - compiler
+      - hardware
+      - chip
+      - EDA
+  - name: arxiv-cs-ar
+    title: arXiv CS.AR
+    url: https://rss.arxiv.org/rss/cs.AR
+    source_type: academic_paper
+    category: research
+    enabled: true
+    limit: 10
+    weight: 7
+    tags:
+      - arxiv
+      - paper
+      - architecture
+    priority_keywords:
+      - accelerator
+      - chip
+      - processor
+      - memory
+      - FPGA
+      - RISC-V
+  - name: arxiv-eess-sp
+    title: arXiv EESS.SP
+    url: https://rss.arxiv.org/rss/eess.SP
+    source_type: academic_paper
+    category: research
+    enabled: true
+    limit: 10
+    weight: 5
+    tags:
+      - arxiv
+      - paper
+      - signal-processing
+    priority_keywords:
+      - signal
+      - circuit
+      - analog
+      - hardware
+      - sensor
+  - name: arxiv-eess-sy
+    title: arXiv EESS.SY
+    url: https://rss.arxiv.org/rss/eess.SY
+    source_type: academic_paper
+    category: research
+    enabled: true
+    limit: 10
+    weight: 5
+    tags:
+      - arxiv
+      - paper
+      - systems
+    priority_keywords:
+      - control
+      - embedded
+      - robotics
+      - autonomous
+      - hardware
+  - name: nature-electronics
+    title: Nature Electronics
+    url: https://www.nature.com/natelectron.rss
+    source_type: journal_article
+    category: research
+    enabled: true
+    limit: 8
+    weight: 8
+    tags:
+      - journal
+      - electronics
+      - semiconductor
+    priority_keywords:
+      - semiconductor
+      - transistor
+      - circuit
+      - chip
+      - EDA
+      - device
+  - name: nature-machine-intelligence
+    title: Nature Machine Intelligence
+    url: https://www.nature.com/natmachintell.rss
+    source_type: journal_article
+    category: research
+    enabled: true
+    limit: 8
+    weight: 6
+    tags:
+      - journal
+      - ai
+      - machine-learning
+    priority_keywords:
+      - agent
+      - efficient
+      - robotics
+      - reasoning
+      - hardware
+  - name: science-robotics
+    title: Science Robotics
+    url: https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=scirobotics
+    source_type: journal_article
+    category: research
+    enabled: true
+    limit: 8
+    weight: 6
+    tags:
+      - journal
+      - robotics
+    priority_keywords:
+      - autonomous
+      - control
+      - sensor
+      - embodied
+      - hardware
 webpages:
   - name: xjtu-jwc-teaching-notice
     title: 西安交大教务处 教学通知

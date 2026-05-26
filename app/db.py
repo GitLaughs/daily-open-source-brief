@@ -598,7 +598,19 @@ def load_recent_items(conn: sqlite3.Connection, source_types: Iterable[str], lim
 
 
 def load_recent_web_items(conn: sqlite3.Connection, limit: int = 80) -> tuple[list[dict[str, Any]], list[int]]:
-    return load_recent_items(conn, ["school_notice", "webpage_entry", "rss_entry", "industry_news", "tech_news"], limit=limit)
+    return load_recent_items(
+        conn,
+        [
+            "school_notice",
+            "webpage_entry",
+            "rss_entry",
+            "industry_news",
+            "tech_news",
+            "academic_paper",
+            "journal_article",
+        ],
+        limit=limit,
+    )
 
 
 def log_source_run(conn: sqlite3.Connection, run: dict[str, Any]) -> None:

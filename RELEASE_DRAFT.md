@@ -1,20 +1,19 @@
-# daily-open-source-brief v0.2.1｜Windows 新手安装与插件增强
+# daily-open-source-brief v0.3.0｜网页与期刊源增强
 
-This patch release keeps the v0.2.0 Windows onboarding and plugin enhancements, and fixes Windows CI cleanup by closing SQLite connections after context-managed use.
+This release expands research discovery with arXiv and journal feed presets, adds RSS 1.0 / RDF parsing for namespaced feed metadata, and makes public-source HTTP fetching proxy-safe by default.
 
-中文关键词：开源日报、Windows 安装、GitHub 项目摘要、RSS 摘要、网页采集、SQLite FTS5、知识库、插件管线、自动化日报。
+中文关键词：开源日报、论文日报、期刊 RSS、arXiv、网页采集、SQLite FTS5、知识库、插件管线、自动化日报。
 
 ## Highlights
 
-- Fixed SQLite connection cleanup on Windows test runners.
-- Added `README.zh-CN.md`, `docs/install-windows.md`, and `docs/workflow-zh.md`.
-- Added Windows scripts for install, validation, and optional scheduled task registration.
-- Added GitHub Actions CI on Windows and Linux.
-- Added optional GitHub Trending collection.
-- Added enricher plugins for feedback weights, deadline extraction, cross-source dedupe, and important-item Lark digests.
-- Added LLM retry helpers, weekly metrics, Lark bot helpers, Webhook delivery, and Jinja HTML email templates.
-- Expanded tests to cover deadline extraction, dedupe, feedback weights, retry behavior, metrics, senders, and plugin behavior.
-- Public package keeps runtime secrets, generated archives, local profiles, databases, private IDs, and deployment targets out of git.
+- Added RSS 1.0 / RDF parser support, including namespaced `dc:*`, `content:*`, and `rdf:about` metadata.
+- Enabled arXiv feeds for CS.AI, CS.LG, CS.AR, EESS.SP, and EESS.SY.
+- Added Nature Electronics, Nature Machine Intelligence, and Science Robotics journal feed presets.
+- Included academic papers and journal articles in recent web item loading for digest selection.
+- Added a shared HTTP client for GitHub, RSS, Trending, and webpage fetchers.
+- HTTP fetches now ignore system proxy settings by default; set `DAILY_BRIEF_TRUST_ENV_PROXY=1` to opt in.
+- Added parser coverage for RDF journal-style feeds and HTTP proxy behavior.
+- Keeps the v0.2.x Windows onboarding, CI, plugin pipeline, and SQLite connection cleanup improvements.
 
 ## Runtime
 
@@ -40,7 +39,7 @@ python -m app.cli kb search Python
 
 Expected:
 
-- 51 unit tests pass.
+- 54 unit tests pass.
 - `git diff --check` passes.
 - Windows script validation passes when dependencies can be installed.
 - Sample run writes a local archive under `public/archive/`.

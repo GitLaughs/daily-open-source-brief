@@ -5,9 +5,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
-
 from .config import env_bool
+from .http_client import http_get
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
@@ -33,7 +32,7 @@ def search_repositories(query: str, limit: int, timeout: int = 30) -> list[dict[
     page = 1
     while len(items) < limit:
         per_page = min(100, limit - len(items))
-        response = requests.get(
+        response = http_get(
             GITHUB_SEARCH_URL,
             headers=headers,
             params={"q": query, "sort": "stars", "order": "desc", "per_page": per_page, "page": page},
@@ -125,4 +124,3 @@ def sample_repositories() -> list[dict[str, Any]]:
             "created_at": "2019-09-01T00:00:00Z",
         },
     ]
-

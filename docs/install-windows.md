@@ -143,6 +143,12 @@ $env:HTTPS_PROXY="http://127.0.0.1:7890"
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
+日报采集默认不读取系统代理，避免 Windows 注册表代理影响公开来源抓取。如果运行时确实需要代理，在 `.env` 中显式开启：
+
+```text
+DAILY_BRIEF_TRUST_ENV_PROXY=1
+```
+
 ### PowerShell 禁止运行脚本
 
 只放开当前窗口：
@@ -154,4 +160,3 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ### 没有 GitHub token
 
 离线 sample 可以运行。真实 GitHub 采集建议配置 `GITHUB_TOKEN`，否则可能遇到 API 限流。
-

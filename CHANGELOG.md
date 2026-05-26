@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.3.0 - 2026-05-26
+
+Research feed discovery and proxy-safe fetching update.
+
+### Highlights
+
+- Added a shared HTTP client for GitHub, RSS, Trending, and webpage fetchers.
+- Public-source HTTP fetches ignore environment proxy settings by default; set `DAILY_BRIEF_TRUST_ENV_PROXY=1` to opt in.
+- Added RSS 1.0 / RDF feed parsing for journal feeds that publish namespaced RSS items.
+- Added enabled arXiv research feeds for AI, machine learning, computer architecture, signal processing, and systems.
+- Added journal feed presets for Nature Electronics, Nature Machine Intelligence, and Science Robotics.
+- Included `academic_paper` and `journal_article` in recent web item loading so research sources appear in digest selection.
+- Added RDF feed parser and HTTP proxy behavior coverage.
+
+### Verify
+
+- `python -m pytest` (54 tests)
+- `git diff --check`
+
 ## v0.2.1 - 2026-05-26
 
 Patch release for Windows CI reliability.
